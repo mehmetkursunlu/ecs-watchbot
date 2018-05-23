@@ -7,6 +7,7 @@ const Watcher = require('../lib/watcher');
 const Message = require('../lib/message');
 const Messages = require('../lib/messages');
 const Worker = require('../lib/worker');
+const fs = require('fs');
 
 test('[watcher] constructor', (assert) => {
   const messages = stubber(Messages).setup();
@@ -25,7 +26,10 @@ test('[watcher] constructor', (assert) => {
 
   const options = {
     queueUrl: 'https://faker',
-    workerOptions: { command: 'echo hello world' }
+    workerOptions: {
+      command: 'echo hello world',
+      volumes: ['/tmp']
+    }
   };
   const watcher = new Watcher(options);
 
@@ -47,7 +51,10 @@ test('[watcher] listen listens until you stop it', async (assert) => {
 
   const watcher = new Watcher({
     queueUrl: 'https://faker',
-    workerOptions: { command: 'echo hello world' }
+    workerOptions: {
+      command: 'echo hello world',
+      volumes: ['/tmp']
+    }
   });
 
   setTimeout(() => (watcher.stop = true), 1000);
@@ -66,7 +73,10 @@ test('[watcher] listen listens until you stop it', async (assert) => {
 test('[watcher] listen', async (assert) => {
   const messages = stubber(Messages).setup();
   const worker = stubber(Worker).setup();
-  const workerOptions = { command: 'echo hello world' };
+  const workerOptions = {
+    command: 'echo hello world',
+    volumes: ['/tmp','/mnt']
+  };
 
   const watcher = new Watcher({
     queueUrl: 'https://faker',
@@ -89,6 +99,8 @@ test('[watcher] listen', async (assert) => {
 
   worker.waitFor.returns(Promise.resolve());
 
+  const chmod = sinon.stub(fs, 'chmod').yields(null);
+
   try {
     await watcher.listen();
   } catch (err) {
@@ -107,6 +119,12 @@ test('[watcher] listen', async (assert) => {
 
   assert.equal(worker.waitFor.callCount, 2, 'waits for both workers');
 
+  assert.equal(chmod.callCount, 2, 'calls chmod twice');
+
+  assert.ok(chmod.calledWith('/tmp', 0o777), 'sets open permissions on /tmp');
+  assert.ok(chmod.calledWith('/mnt', 0o777), 'sets open permissions on /mnt');
+
+  chmod.restore();
   messages.teardown();
   worker.teardown();
   assert.end();
@@ -115,7 +133,10 @@ test('[watcher] listen', async (assert) => {
 test('[watcher] factory', (assert) => {
   const watcher = Watcher.create({
     queueUrl: 'https://faker',
-    workerOptions: { command: 'echo hello world' }
+    workerOptions: {
+      command: 'echo hello world',
+      volumes: ['/tmp']
+    }
   });
 
   assert.ok(watcher instanceof Watcher, 'creates a Watcher object');

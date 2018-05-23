@@ -4,6 +4,7 @@ const stream = require('stream');
 const events = require('events');
 const child_process = require('child_process');
 const fs = require('fs');
+const fsExtra = require('fs-extra');
 const test = require('tape');
 const sinon = require('sinon');
 const Worker = require('../lib/worker');
@@ -31,7 +32,7 @@ test('[worker] constructor', (assert) => {
   );
 
   const message = sinon.createStubInstance(Message);
-  const worker = new Worker(message, { command: 'echo hello world' });
+  const worker = new Worker(message, { command: 'echo hello world', volumes: ['/tmp'] });
 
   assert.equal(worker.message, message, 'sets .message');
   assert.equal(worker.command, 'echo hello world', 'sets .command');
@@ -41,7 +42,7 @@ test('[worker] constructor', (assert) => {
 
 test('[worker] factory', (assert) => {
   const message = sinon.createStubInstance(Message);
-  const options = { command: 'echo hello world' };
+  const options = { command: 'echo hello world', volumes: ['/tmp'] };
   const worker = Worker.create(message, options);
   assert.ok(worker instanceof Worker, 'returns a Worker object');
   assert.end();
@@ -50,7 +51,7 @@ test('[worker] factory', (assert) => {
 test('[worker] fail', async (assert) => {
   const logger = stubber(Logger).setup();
   const message = sinon.createStubInstance(Message);
-  const options = { command: 'echo hello world' };
+  const options = { command: 'echo hello world', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const results = { code: 124, signal: 'SIGTERM', duration: 12345 };
@@ -66,7 +67,7 @@ test('[worker] fail', async (assert) => {
 test('[worker] noop', async (assert) => {
   const logger = stubber(Logger).setup();
   const message = sinon.createStubInstance(Message);
-  const options = { command: 'echo hello world' };
+  const options = { command: 'echo hello world', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const results = { code: 4, duration: 12345 };
@@ -82,7 +83,7 @@ test('[worker] noop', async (assert) => {
 test('[worker] ignore', async (assert) => {
   const logger = stubber(Logger).setup();
   const message = sinon.createStubInstance(Message);
-  const options = { command: 'echo hello world' };
+  const options = { command: 'echo hello world', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const results = { code: 3, duration: 12345 };
@@ -99,7 +100,7 @@ test('[worker] success', async (assert) => {
   const logger = stubber(Logger).setup();
 
   const message = sinon.createStubInstance(Message);
-  const options = { command: 'echo hello world' };
+  const options = { command: 'echo hello world', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const results = { code: 0, duration: 12345 };
@@ -127,7 +128,7 @@ test('[worker] waitFor, exit 0', async (assert) => {
   logger.type = 'worker';
   logger.message = message;
 
-  const options = { command: 'echo ${Message}' };
+  const options = { command: 'echo ${Message}', volumes: ['/tmp', '/var/tmp'] };
   const worker = new Worker(message, options);
 
   const env = process.env;
@@ -136,6 +137,7 @@ test('[worker] waitFor, exit 0', async (assert) => {
   sinon.spy(child_process, 'spawn');
   sinon.spy(process.stdout, 'write');
   sinon.spy(process.stderr, 'write');
+  sinon.spy(fsExtra, 'emptyDir');
 
   try {
     await worker.waitFor();
@@ -168,6 +170,11 @@ test('[worker] waitFor, exit 0', async (assert) => {
   assert.ok(results.duration, 'logged worker success duration');
   assert.equal(message.complete.callCount, 1, 'called message.complete()');
 
+  assert.equal(fsExtra.emptyDir.callCount, 2, 'called fsExtra.emptyDir() twice')
+  assert.ok(fsExtra.emptyDir.calledWith('/tmp'), 'called fsExtra.emptyDir() on /tmp')
+  assert.ok(fsExtra.emptyDir.calledWith('/var/tmp'), 'called fsExtra.emptyDir() on /tmp')
+
+  fsExtra.emptyDir.restore();
   Date.prototype.toGMTString.restore();
   child_process.spawn.restore();
   process.env = env;
@@ -190,7 +197,7 @@ test('[worker] waitFor, write to /tmp, exit 0', async (assert) => {
   logger.type = 'worker';
   logger.message = message;
 
-  const options = { command: 'echo ${Message} > /tmp/banana.txt && cat /tmp/banana.txt' };
+  const options = { command: 'echo ${Message} > /tmp/banana.txt && cat /tmp/banana.txt', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const env = process.env;
@@ -256,7 +263,7 @@ test('[worker] waitFor, attempt to write to root, exit 2', async (assert) => {
   logger.type = 'worker';
   logger.message = message;
 
-  const options = { command: 'echo ${Message} > /banana.txt && cat /banana.txt' };
+  const options = { command: 'echo ${Message} > /banana.txt && cat /banana.txt', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   const env = process.env;
@@ -310,7 +317,7 @@ test('[worker] waitFor, exit 1', async (assert) => {
   logger.stream.restore();
   const message = sinon.createStubInstance(Message);
   message.env = { Message: 'banana' };
-  const options = { command: 'exit 1' };
+  const options = { command: 'exit 1', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   sinon.spy(child_process, 'spawn');
@@ -337,7 +344,7 @@ test('[worker] waitFor, exit 3', async (assert) => {
   logger.stream.restore();
   const message = sinon.createStubInstance(Message);
   message.env = { Message: 'banana' };
-  const options = { command: 'exit 3' };
+  const options = { command: 'exit 3', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   sinon.spy(child_process, 'spawn');
@@ -364,7 +371,7 @@ test('[worker] waitFor, exit 4', async (assert) => {
   logger.stream.restore();
   const message = sinon.createStubInstance(Message);
   message.env = { Message: 'banana' };
-  const options = { command: 'exit 4' };
+  const options = { command: 'exit 4', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
 
   sinon.spy(child_process, 'spawn');
@@ -391,7 +398,7 @@ test('[worker] waitFor, child_process.spawn failure', async (assert) => {
   logger.stream.restore();
   const message = sinon.createStubInstance(Message);
   message.env = { Message: 'banana' };
-  const options = { command: 'echo ${Message}' };
+  const options = { command: 'echo ${Message}', volumes: ['/tmp'] };
   const worker = new Worker(message, options);
   const err = new Error('foo');
 
