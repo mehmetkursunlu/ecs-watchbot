@@ -434,6 +434,10 @@ Object {
                 },
               },
               Object {
+                "Name": "Volumes",
+                "Value": "/tmp,/data,/ephemeral",
+              },
+              Object {
                 "Name": "MyKey",
                 "Value": "MyValue",
               },
@@ -943,6 +947,10 @@ Object {
                 "Value": Object {
                   "Ref": "WatchbotQueue",
                 },
+              },
+              Object {
+                "Name": "Volumes",
+                "Value": "/tmp",
               },
             ],
             "Image": Object {
