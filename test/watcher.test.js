@@ -99,8 +99,6 @@ test('[watcher] listen', async (assert) => {
 
   worker.waitFor.returns(Promise.resolve());
 
-  const chmod = sinon.stub(fs, 'chmod').yields(null);
-
   try {
     await watcher.listen();
   } catch (err) {
@@ -119,12 +117,9 @@ test('[watcher] listen', async (assert) => {
 
   assert.equal(worker.waitFor.callCount, 2, 'waits for both workers');
 
-  assert.equal(chmod.callCount, 2, 'calls chmod twice');
+  assert.equal((fs.statSync('/tmp').mode & parseInt('777', 8)).toString(8), '777', 'calls chmod on /tmp');
+  assert.equal((fs.statSync('/mnt').mode & parseInt('777', 8)).toString(8), '777', 'calls chmod on /mnt');
 
-  assert.ok(chmod.calledWith('/tmp', 0o777), 'sets open permissions on /tmp');
-  assert.ok(chmod.calledWith('/mnt', 0o777), 'sets open permissions on /mnt');
-
-  chmod.restore();
   messages.teardown();
   worker.teardown();
   assert.end();
